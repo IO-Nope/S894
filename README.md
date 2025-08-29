@@ -1,2 +1,2 @@
 # S894
-A opensource lesson which
+A opensource lesson , accelerating computing
