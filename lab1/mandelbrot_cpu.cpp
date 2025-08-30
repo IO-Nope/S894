@@ -68,6 +68,9 @@ void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out)
 void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     // TODO: Implement this function.
     // int count = 0;
+    const __m256 vect = _mm256_set1_ps(4.0f);
+    const __m256 vecm = _mm256_set1_ps(max_iters);
+    const __m256 veco = _mm256_set1_ps(1.0f);
     for(uint64_t i = 0; i< img_size ; ++i){
         for ( uint64_t j = 0; j < img_size ; j+=8){
             __m256 vecx = _mm256_set1_ps((float(j) / float(img_size)) * 2.5f - 2.0f);
@@ -82,9 +85,7 @@ void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out)
             __m256 vecy2 = _mm256_set1_ps(0.0f);
             __m256 w = _mm256_set1_ps(0.0f);
             __m256 iters = _mm256_set1_ps(0.0f);       
-            const __m256 vect = _mm256_set1_ps(4.0f);
-            const __m256 vecm = _mm256_set1_ps(max_iters);
-            const __m256 veco = _mm256_set1_ps(1.0f);
+
             __m256 sum = _mm256_add_ps(vecx2,vecy2);
             uint8_t k1 =AVX2_COMPARE_MASK(sum,vect,_CMP_LE_OS);
             uint8_t k2 =AVX2_COMPARE_MASK(iters,vecm,_CMP_LT_OS);
