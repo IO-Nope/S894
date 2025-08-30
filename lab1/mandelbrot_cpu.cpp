@@ -4,19 +4,72 @@
 //  -i <implementation: {"scalar", "vector"}>
 
 #include <cmath>
+#include <cstdio>
 #include <cstdint>
 #include <immintrin.h>
+#include <cstdarg>
+#include <fstream>
+#include "../utils.cpp"
+const int max_print = 256;
+bool scflag = 1;
+bool veflag =1;
+float cmp1[max_print];
+float cmp2[max_print];
 
+void Dprint(const char* format, ...) {
+    char buffer[1024];
+
+    va_list args;
+    va_start(args, format);
+
+    std::vsnprintf(buffer, sizeof(buffer), format, args);
+
+    va_end(args);
+
+    std::ofstream outfile("tempout.txt", std::ios::app);
+    if (outfile.is_open()) {
+        outfile << buffer<<"\n"; // 写入文件
+        outfile.close();   // 关闭文件
+    }
+}
+void Dprint(float cx, int& count) {
+    if (count < max_print) {
+        std::ofstream outfile("tempout.txt", std::ios::app);
+        if (outfile.is_open()) {
+            if(!(count%8))outfile << "\n";
+            outfile << count<<":" <<cx << " "; 
+            outfile.close();     
+        }
+        count++;
+    }
+}
+void Dprint( __m256 cx_vec, int& count) {
+    const int step = 8;
+    for (int i = 0; i < step; i++) {
+        if (count < max_print) {
+            float cx = ((float*)&cx_vec)[i]; 
+            std::ofstream outfile("tempout.txt", std::ios::app);
+            if (outfile.is_open()) {
+                if(!(count%8))outfile << "\n";
+                outfile << count <<":"<< cx << " "; 
+                outfile.close();      
+            }
+            count++;
+        }
+    }
+}
 // CPU Scalar Mandelbrot set generation.
 // Based on the "optimized escape time algorithm" in
 // https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set
 void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
+    // int count = 0;
     for (uint64_t i = 0; i < img_size; ++i) {
         for (uint64_t j = 0; j < img_size; ++j) {
+
             // Get the plane coordinate X for the image pixel.
             float cx = (float(j) / float(img_size)) * 2.5f - 2.0f;
             float cy = (float(i) / float(img_size)) * 2.5f - 1.25f;
-
+            //if(scflag&&!j)Dprint(cy,count);
             // Innermost loop: start the recursion from z = 0.
             float x2 = 0.0f;
             float y2 = 0.0f;
@@ -30,18 +83,77 @@ void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out)
                 float z = x + y;
                 w = z * z;
                 ++iters;
+                // if(scflag)Dprint(x,count);
             }
 
             // Write result.
+            //if(scflag)Dprint(iters,count);
             out[i * img_size + j] = iters;
         }
     }
+    // if(scflag)Dprint("\nscalar结束\n");
+    // scflag =0;
 }
 
 /// <--- your code here --->
 
 void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     // TODO: Implement this function.
+    // int count = 0;
+    for(uint64_t i = 0; i< img_size ; ++i){
+        for ( uint64_t j = 0; j < img_size ; j+=8){
+            __m256 vecx = _mm256_set1_ps((float(j) / float(img_size)) * 2.5f - 2.0f);
+            __m256 vecy = _mm256_set1_ps((float(i) / float(img_size)) * 2.5f - 1.25f);
+            __m256 vectemp = _mm256_set1_ps((1.0f/float(img_size))* 2.5f);  
+            __m256 fc = _mm256_set_ps(7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f, 0.0f);
+            vectemp = _mm256_mul_ps(vectemp,fc);
+            vecx = _mm256_add_ps(vectemp,vecx);
+            //if(veflag&&!j)Dprint((vecy)[0],count);
+
+            __m256 vecx2 = _mm256_set1_ps(0.0f);
+            __m256 vecy2 = _mm256_set1_ps(0.0f);
+            __m256 w = _mm256_set1_ps(0.0f);
+            __m256 iters = _mm256_set1_ps(0.0f);       
+            const __m256 vect = _mm256_set1_ps(4.0f);
+            const __m256 vecm = _mm256_set1_ps(max_iters);
+            const __m256 veco = _mm256_set1_ps(1.0f);
+            __m256 sum = _mm256_add_ps(vecx2,vecy2);
+            uint8_t k1 =AVX2_COMPARE_MASK(sum,vect,_CMP_LE_OS);
+            uint8_t k2 =AVX2_COMPARE_MASK(iters,vecm,_CMP_LT_OS);
+            uint8_t k = k1&k2;
+            while (k>0b0)
+            {
+                __m256 x= _mm256_set1_ps(0.0f);
+                __m256 y = _mm256_set1_ps(0.0f);
+
+
+                x = masked_sub_ps(x,k,vecx2,vecy2);
+                x = masked_add_ps(x,k,x,vecx);
+                y = masked_sub_ps(y,k,w,vecx2);
+                y = masked_sub_ps(y,k,y,vecy2);
+                y = masked_add_ps(y,k,y,vecy);
+
+                vecx2 = masked_mul_ps(vecx2,k,x,x);
+                vecy2 = masked_mul_ps(vecy2,k,y,y);
+                __m256 z = _mm256_add_ps(x,y);
+                w = masked_mul_ps(w,k,z,z);
+                iters = masked_add_ps(iters,k,iters,veco);
+                sum = _mm256_add_ps(vecx2,vecy2);
+                k1 =AVX2_COMPARE_MASK(sum,vect,_CMP_LE_OS);
+                k2 =AVX2_COMPARE_MASK(iters,vecm,_CMP_LT_OS);
+                k = k1&k2;
+                // if(veflag)Dprint(x,count);
+            }
+            float temp[8];
+            //if(veflag)Dprint(iters,count);
+            _mm256_storeu_ps(temp,iters);
+            for(uint8_t t = 0;t<8;++t){
+                out[i * img_size + j +t]= temp[t];
+            }
+        }
+    }
+    // if(veflag)Dprint("\nvector 结束\n");
+    // veflag =0;
 }
 
 /// <--- /your code here --->
@@ -103,7 +215,7 @@ int ParseArgsAndMakeSpec(
                     std::cerr << "Error: unknown implementation" << std::endl;
                     return 1;
                 }
-            } else {
+          } else {
                 std::cerr << "Error: No value specified for -i" << std::endl;
                 return 1;
             }
@@ -112,7 +224,7 @@ int ParseArgsAndMakeSpec(
             return 1;
         }
     }
-    std::cout << "Testing with image size " << *img_size << "x" << *img_size << " and "
+    std::cout << "测试图片大小为 " << *img_size << "x" << *img_size << " 和 "
               << *max_iters << " max iterations." << std::endl;
 
     return 0;
@@ -190,7 +302,7 @@ static constexpr size_t kNumOfOuterIterations = 10;
 static constexpr size_t kNumOfInnerIterations = 1;
 #define BENCHPRESS(func, ...) \
     do { \
-        std::cout << "Running " << #func << " ...\n"; \
+        std::cout << "正在运行 " << #func << " ...\n"; \
         std::vector<double> times(kNumOfOuterIterations); \
         for (size_t i = 0; i < kNumOfOuterIterations; ++i) { \
             auto start = std::chrono::high_resolution_clock::now(); \
@@ -203,7 +315,7 @@ static constexpr size_t kNumOfInnerIterations = 1;
                 kNumOfInnerIterations; \
         } \
         std::sort(times.begin(), times.end()); \
-        std::cout << "  Runtime: " << times[0] / 1'000'000 << " ms" << std::endl; \
+        std::cout << "  运行时间: " << times[0] / 1'000'000 << " ms" << std::endl; \
     } while (0)
 
 double difference(
@@ -260,7 +372,6 @@ int main(int argc, char *argv[]) {
         memset(result.data(), 0, sizeof(uint32_t) * img_size * img_size);
         BENCHPRESS(mandelbrot_cpu_vector, img_size, max_iters, result.data());
         dump_image("out/mandelbrot_cpu_vector.bmp", img_size, max_iters, result);
-
         std::cout << "  Correctness: average output difference from reference = "
                   << difference(img_size, max_iters, result, ref_result) << std::endl;
     }
