@@ -1,6 +1,39 @@
 #include <immintrin.h>
 #include <stdint.h>
+const int max_print = 256;
+const bool debug =1;
+bool scflag = 1;
+bool veflag =1;
+float cmp1[max_print];
+float cmp2[max_print];
 
+void Dprint(const char* format, ...) {
+    char buffer[1024];
+
+    va_list args;
+    va_start(args, format);
+
+    std::vsnprintf(buffer, sizeof(buffer), format, args);
+
+    va_end(args);
+
+    std::ofstream outfile("tempout.txt", std::ios::app);
+    if (outfile.is_open()) {
+        outfile << buffer<<"\n"; // 写入文件
+        outfile.close();   // 关闭文件
+    }
+}
+void Dprint(float cx, int& count) {
+    if (count < max_print) {
+        std::ofstream outfile("tempout.txt", std::ios::app);
+        if (outfile.is_open()) {
+            if(!(count%8))outfile << "\n";
+            outfile << count<<":" <<cx << " "; 
+            outfile.close();     
+        }
+        count++;
+    }
+}
 // 将 __mmask8 转换为 AVX2 掩码向量
 inline __m256 mask_to_m256(__mmask8 mask) {
     // 将掩码的每一位扩展为 32 位整数

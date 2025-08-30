@@ -10,39 +10,7 @@
 #include <cstdarg>
 #include <fstream>
 #include "../utils.cpp"
-const int max_print = 256;
-bool scflag = 1;
-bool veflag =1;
-float cmp1[max_print];
-float cmp2[max_print];
 
-void Dprint(const char* format, ...) {
-    char buffer[1024];
-
-    va_list args;
-    va_start(args, format);
-
-    std::vsnprintf(buffer, sizeof(buffer), format, args);
-
-    va_end(args);
-
-    std::ofstream outfile("tempout.txt", std::ios::app);
-    if (outfile.is_open()) {
-        outfile << buffer<<"\n"; // 写入文件
-        outfile.close();   // 关闭文件
-    }
-}
-void Dprint(float cx, int& count) {
-    if (count < max_print) {
-        std::ofstream outfile("tempout.txt", std::ios::app);
-        if (outfile.is_open()) {
-            if(!(count%8))outfile << "\n";
-            outfile << count<<":" <<cx << " "; 
-            outfile.close();     
-        }
-        count++;
-    }
-}
 void Dprint( __m256 cx_vec, int& count) {
     const int step = 8;
     for (int i = 0; i < step; i++) {
