@@ -1,5 +1,8 @@
 #include <immintrin.h>
 #include <stdint.h>
+#include <cstdarg>
+#include <cstdio>
+#include <fstream>
 const int max_print = 256;
 const bool debug =1;
 bool scflag = 1;
@@ -23,7 +26,7 @@ void Dprint(const char* format, ...) {
         outfile.close();   // 关闭文件
     }
 }
-void Dprint(float cx, int& count) {
+void Dprint(const float cx, int& count) {
     if (count < max_print) {
         std::ofstream outfile("tempout.txt", std::ios::app);
         if (outfile.is_open()) {
@@ -32,6 +35,21 @@ void Dprint(float cx, int& count) {
             outfile.close();     
         }
         count++;
+    }
+}
+void Dprint( const __m256 cx_vec, int& count) {
+    const int step = 8;
+    for (int i = 0; i < step; i++) {
+        if (count < max_print) {
+            float cx = ((float*)&cx_vec)[i]; 
+            std::ofstream outfile("tempout.txt", std::ios::app);
+            if (outfile.is_open()) {
+                if(!(count%8))outfile << "\n";
+                outfile << count <<":"<< cx << " "; 
+                outfile.close();      
+            }
+            count++;
+        }
     }
 }
 // 将 __mmask8 转换为 AVX2 掩码向量
