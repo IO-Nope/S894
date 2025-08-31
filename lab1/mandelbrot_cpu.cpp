@@ -11,21 +11,7 @@
 #include <fstream>
 #include "../utils.cpp"
 
-void Dprint( __m256 cx_vec, int& count) {
-    const int step = 8;
-    for (int i = 0; i < step; i++) {
-        if (count < max_print) {
-            float cx = ((float*)&cx_vec)[i]; 
-            std::ofstream outfile("tempout.txt", std::ios::app);
-            if (outfile.is_open()) {
-                if(!(count%8))outfile << "\n";
-                outfile << count <<":"<< cx << " "; 
-                outfile.close();      
-            }
-            count++;
-        }
-    }
-}
+
 // CPU Scalar Mandelbrot set generation.
 // Based on the "optimized escape time algorithm" in
 // https://en.wikipedia.org/wiki/Plotting_algorithms_for_the_Mandelbrot_set
@@ -68,23 +54,24 @@ void mandelbrot_cpu_scalar(uint32_t img_size, uint32_t max_iters, uint32_t *out)
 void mandelbrot_cpu_vector(uint32_t img_size, uint32_t max_iters, uint32_t *out) {
     // TODO: Implement this function.
     // int count = 0;
+    const __m256 vect = _mm256_set1_ps(4.0f);
+    const __m256 vecm = _mm256_set1_ps(max_iters);
+    const __m256 veco = _mm256_set1_ps(1.0f);
     for(uint64_t i = 0; i< img_size ; ++i){
+        __m256 vecy = _mm256_set1_ps((float(i) / float(img_size)) * 2.5f - 1.25f);
         for ( uint64_t j = 0; j < img_size ; j+=8){
             __m256 vecx = _mm256_set1_ps((float(j) / float(img_size)) * 2.5f - 2.0f);
-            __m256 vecy = _mm256_set1_ps((float(i) / float(img_size)) * 2.5f - 1.25f);
+            
             __m256 vectemp = _mm256_set1_ps((1.0f/float(img_size))* 2.5f);  
             __m256 fc = _mm256_set_ps(7.0f, 6.0f, 5.0f, 4.0f, 3.0f, 2.0f, 1.0f, 0.0f);
             vectemp = _mm256_mul_ps(vectemp,fc);
             vecx = _mm256_add_ps(vectemp,vecx);
             //if(veflag&&!j)Dprint((vecy)[0],count);
-
             __m256 vecx2 = _mm256_set1_ps(0.0f);
             __m256 vecy2 = _mm256_set1_ps(0.0f);
             __m256 w = _mm256_set1_ps(0.0f);
             __m256 iters = _mm256_set1_ps(0.0f);       
-            const __m256 vect = _mm256_set1_ps(4.0f);
-            const __m256 vecm = _mm256_set1_ps(max_iters);
-            const __m256 veco = _mm256_set1_ps(1.0f);
+
             __m256 sum = _mm256_add_ps(vecx2,vecy2);
             uint8_t k1 =AVX2_COMPARE_MASK(sum,vect,_CMP_LE_OS);
             uint8_t k2 =AVX2_COMPARE_MASK(iters,vecm,_CMP_LT_OS);
